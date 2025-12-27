@@ -1,7 +1,0 @@
-Running: xsim.dir/Top_UART_Module_behav/xsimk.exe -simmode gui -wdb Top_UART_Module_behav.wdb -simrunnum 0 -socket 58024
-Design successfully loaded
-Design Loading Memory Usage: 10828 KB (Peak: 10828 KB)
-Design Loading CPU Usage: 15 ms
-Simulation completed
-Simulation Memory Usage: 11744 KB (Peak: 11744 KB)
-Simulation CPU Usage: 46 ms

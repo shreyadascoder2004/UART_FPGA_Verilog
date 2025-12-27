@@ -1,4 +1,0 @@
-Time resolution is 1 ps
-Time=0 | TXD=x | RxData=xx | LED=xx | Transmit=x
-Time=5000 | TXD=1 | RxData=00 | LED=00 | Transmit=0
-=== UART Full Loopback Simulation Started ===
