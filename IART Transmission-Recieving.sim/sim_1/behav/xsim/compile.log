@@ -1,0 +1,12 @@
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/shrey/UART Transmission-Recieving/IART Transmission-Recieving.srcs/sources_1/new/Transmitter.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module Transmitter
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/shrey/UART Transmission-Recieving/IART Transmission-Recieving.srcs/sources_1/new/debounce_signal.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module Debounce_Signals
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/shrey/UART Transmission-Recieving/IART Transmission-Recieving.srcs/sources_1/new/receiver.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module UART_Receiver
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/shrey/UART Transmission-Recieving/IART Transmission-Recieving.srcs/sources_1/new/top_module.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module Top_UART_Module
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/shrey/UART Transmission-Recieving/IART Transmission-Recieving.srcs/sim_1/new/simulation_testbench.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module tb_UART_FullLoop
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/shrey/UART Transmission-Recieving/IART Transmission-Recieving.sim/sim_1/behav/xsim/glbl.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module glbl

@@ -1,0 +1,15 @@
+# Vivado auto-generated files
+*.jou
+*.log
+*.str
+*.wdb
+*.runs/
+*.sim/
+*.cache/
+*.hw/
+*.backup/
+*.xml
+
+# OS generated files
+Thumbs.db
+.DS_Store
