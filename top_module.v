@@ -1,68 +1,54 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 06.11.2025 19:50:48
-// Design Name: 
-// Module Name: top_module
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
+module Top_UART_Module #(
+    parameter debounce_threshold = 1000000
+)(
+    input clk,
+    input btn_transmit,
+    input btn_reset,
+    input [7:0] data,
 
-module Top_UART_Module(
-    input clk,             // 100 MHz clock from Basys3
-    input btn_transmit,    // Transmit button
-    input btn_reset,       // Reset button
-    input [7:0] data,      // Data to transmit
-    output TXD,            // UART TX line
-    output TXD_debug,      // Debug: TXD
-    output Transmit_debug, // Debug: debounced transmit
-    output Btn_debug,      // Debug: raw transmit button
-    output Reset_debug     // Debug: raw reset button
+    output TXD,
+    output TXD_debug,
+    output Transmit_debug,
+    output Btn_debug,
+    output Reset_debug
 );
 
-    // Internal wires
     wire transmit_clean;
     wire reset_clean;
 
-    // Debounce transmit button (positional)
-    Debounce_Signals debounce_transmit (
-        clk,
-        btn_transmit,
-        transmit_clean
+    // Transmit button debounce
+    Debounce_Signals #(
+        .treshold(debounce_threshold)
+    ) debounce_transmit (
+        .clk(clk),
+        .btn(btn_transmit),
+        .transmit(transmit_clean)
     );
 
-    // Debounce reset button (positional)
-    Debounce_Signals debounce_reset (
-        clk,
-        btn_reset,
-        reset_clean
+    // Reset button debounce
+    Debounce_Signals #(
+        .treshold(debounce_threshold)
+    ) debounce_reset (
+        .clk(clk),
+        .btn(btn_reset),
+        .transmit(reset_clean)
     );
 
-    // UART Transmitter (positional)
+    // UART transmitter
     Transmitter uart_tx (
-        data,
-        clk,
-        reset_clean,
-        transmit_clean,
-        TXD
+        .data(data),
+        .clk(clk),
+        .reset(reset_clean),
+        .transmit(transmit_clean),
+        .TXD(TXD)
     );
 
-    // Debug assignments
-    assign TXD_debug       = TXD;
-    assign Transmit_debug  = transmit_clean;
-    assign Btn_debug       = btn_transmit;
-    assign Reset_debug     = btn_reset;
+    // Debug
+    assign TXD_debug      = TXD;
+    assign Transmit_debug = transmit_clean;
+    assign Btn_debug      = btn_transmit;
+    assign Reset_debug    = btn_reset;
 
 endmodule
