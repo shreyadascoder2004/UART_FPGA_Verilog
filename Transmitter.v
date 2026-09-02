@@ -1,76 +1,80 @@
-module Transmitter(
+module Transmitter #(
+    parameter clk_freq = 100_000_000,
+    parameter baud_rate = 9600
+)(
     input [7:0] data,
     input clk,
     input reset,
     input transmit,
     output reg TXD
 );
-    // Internal registers
+
+    localparam integer BAUD_COUNT = clk_freq / baud_rate;
+
+    reg [13:0] baudrate_counter;
     reg [3:0] bit_counter;
-    reg [20:0] baudrate_counter;
-    reg shift, load, clear;
     reg [9:0] shift_register;
-    reg state, next_state;
+    reg busy;
 
-    // Sequential logic: baudrate timing and state transitions
     always @(posedge clk) begin
+
         if (reset) begin
-            bit_counter <= 0;
             baudrate_counter <= 0;
-            state <= 0;
-        end else begin
-            baudrate_counter <= baudrate_counter + 1;
-            if (baudrate_counter == 10416) begin // Assuming 9600 baud with 100MHz clock
-                state <= next_state;
+            bit_counter      <= 0;
+            shift_register   <= 10'b1111111111;
+            TXD              <= 1'b1;
+            busy             <= 1'b0;
+        end
+
+        else begin
+
+            // Start transmission
+            if (transmit && !busy) begin
+
+                // stop + data + start
+                shift_register <= {1'b1, data, 1'b0};
+
                 baudrate_counter <= 0;
+                bit_counter <= 0;
+                busy <= 1'b1;
 
-                if (load)
-                    shift_register <= {1'b1, data[7:0], 1'b0}; // Stop bit, data, start bit
+                // Start bit
+                TXD <= 1'b0;
+            end
 
-                if (clear)
-                    bit_counter <= 0;
+            else if (busy) begin
 
-                if (shift)
-                    shift_register <= shift_register >> 1;
+                if (baudrate_counter == BAUD_COUNT-1) begin
 
-                bit_counter <= bit_counter + 1;
+                    baudrate_counter <= 0;
+
+                    if (bit_counter < 9) begin
+
+                        bit_counter <= bit_counter + 1;
+
+                        shift_register <= shift_register >> 1;
+
+                        TXD <= shift_register[1];
+
+                    end
+
+                    else begin
+
+                        bit_counter <= 0;
+                        busy <= 1'b0;
+
+                        // UART idle / stop
+                        TXD <= 1'b1;
+
+                    end
+                end
+
+                else begin
+                    baudrate_counter <= baudrate_counter + 1;
+                end
             end
         end
     end
 
-    // Mealy state machine for transmission control
-    always @(posedge clk) begin
-        // Default control signals
-        load <= 0;
-        shift <= 0;
-        clear <= 0;
-        TXD <= 1;
-
-        case (state)
-            0: begin // Idle state
-                if (transmit) begin
-                    next_state <= 1;
-                    load <= 1;
-                    shift <= 0;
-                    clear <= 0;
-                end else begin
-                    next_state <= 0;
-                    TXD <= 1;
-                end
-            end
-
-            1: begin // Transmitting state
-                if (bit_counter == 10) begin
-                    next_state <= 0;
-                    clear <= 1;
-                end else begin
-                    next_state <= 1;
-                    TXD <= shift_register[0];
-                    shift <= 1;
-                end
-            end
-
-            default: next_state <= 0;
-        endcase
-    end
 endmodule
+             
