@@ -1,102 +1,368 @@
-`timescale 1ns / 1ps
+class transaction;
 
-//////////////////////////////////////////////////////////////////////////////////
-// Advanced Full-Loopback Testbench for Top_UART_Module and UART_Receiver
-//////////////////////////////////////////////////////////////////////////////////
+    rand bit [7:0] data;
 
-module tb_UART_FullLoop;
+    bit TXD;
+    bit [7:0] RxData;
+    bit done;
 
-    // Inputs for Top_UART_Module
-    reg clk;
-    reg btn_transmit;
-    reg btn_reset;
-    reg [7:0] data;
+    function transaction copy();
 
-    // Outputs from Top_UART_Module
-    wire TXD;
-    wire TXD_debug;
-    wire Transmit_debug;
-    wire Btn_debug;
-    wire Reset_debug;
+        copy = new();
 
-    // Outputs from UART_Receiver
-    wire [7:0] RxData;
-    wire [7:0] LED;
+        copy.data   = this.data;
+        copy.TXD    = this.TXD;
+        copy.RxData = this.RxData;
+        copy.done   = this.done;
 
-    // Instantiate Top_UART_Module
-    Top_UART_Module uut_tx (
-        .clk(clk),
-        .btn_transmit(btn_transmit),
-        .btn_reset(btn_reset),
-        .data(data),
-        .TXD(TXD),
-        .TXD_debug(TXD_debug),
-        .Transmit_debug(Transmit_debug),
-        .Btn_debug(Btn_debug),
-        .Reset_debug(Reset_debug)
-    );
+    endfunction
 
-    // Instantiate UART_Receiver
-    UART_Receiver uut_rx (
-        .clk_fpga(clk),
-        .reset_button(btn_reset),
-        .RxD(TXD),       // Connect TXD from transmitter to receiver
-        .RxData(RxData),
-        .LED(LED)
-    );
+endclass
+class generator;
 
-    // Clock generation: 100 MHz
-    initial clk = 0;
-    always #5 clk = ~clk; // 10 ns period
+    transaction tr;
 
-    // Task to transmit a byte using Top_UART_Module
-    task transmit_byte(input [7:0] byte);
-        begin
-            data = byte;
-            btn_transmit = 1;   // press transmit
-            #20;                // short pulse
-            btn_transmit = 0;
+    mailbox #(transaction) mbx;
 
-            // Wait enough time for UART to finish sending 10 bits (start+data+stop)
-            #(10416*10*10);     // 10 bits * 9600 baud timing * safety factor
+    int count = 0;
+
+    event drvnext;
+    event sconext;
+    event done;
+
+
+    function new(mailbox #(transaction) mbx);
+
+        this.mbx = mbx;
+
+        tr = new();
+
+    endfunction
+
+
+    task run();
+
+        repeat(count) begin
+
+            assert(tr.randomize())
+            else $error("[GEN] Randomization Failed");
+
+
+            $display("[GEN] DATA = %0d (0x%02h)",
+                     tr.data,
+                     tr.data);
+
+
+            mbx.put(tr.copy());
+
+
+            // Wait for driver
+            @(drvnext);
+
+            // Wait for scoreboard
+            @(sconext);
+
         end
+
+        -> done;
+
+    endtask
+endclass
+    class driver;
+
+    virtual uart_if vif;
+
+    mailbox #(transaction) mbx;
+
+    transaction tr;
+
+    event drvnext;
+
+
+    function new(mailbox #(transaction) mbx);
+
+        this.mbx = mbx;
+
+    endfunction
+
+
+    task reset();
+
+        vif.btn_reset    <= 1'b1;
+        vif.btn_transmit <= 1'b0;
+        vif.data         <= 8'h00;
+
+        repeat(20)
+            @(posedge vif.clk);
+
+        vif.btn_reset <= 1'b0;
+
+        repeat(20)
+            @(posedge vif.clk);
+
+        $display("[DRV] RESET DONE");
+        $display("------------------------------------");
+
     endtask
 
-    // Main simulation
-    initial begin
-        // Initialize signals
-        clk = 0;
-        btn_transmit = 0;
-        btn_reset = 1; // reset active
-        data = 8'h00;
 
-        #50;
-        btn_reset = 0; // release reset
+    task run();
 
-        $display("=== UART Full Loopback Simulation Started ===");
+        forever begin
 
-        // Transmit bytes and observe receiver
-        transmit_byte(8'hA5);
-        $display("Transmitted: 0xA5, Receiver RxData = 0x%0h", RxData);
+            mbx.get(tr);
 
-        transmit_byte(8'h3C);
-        $display("Transmitted: 0x3C, Receiver RxData = 0x%0h", RxData);
 
-        transmit_byte(8'hFF);
-        $display("Transmitted: 0xFF, Receiver RxData = 0x%0h", RxData);
+            // Put data on DUT
+            vif.data <= tr.data;
 
-        transmit_byte(8'h00);
-        $display("Transmitted: 0x00, Receiver RxData = 0x%0h", RxData);
+            $display("[DRV] DATA = %0d",
+                     tr.data);
 
-        $display("=== UART Full Loopback Simulation Finished ===");
-        #500000;
-        $finish;
-    end
 
-    // Optional: monitor key signals in console
-    initial begin
-        $monitor("Time=%0t | TXD=%b | RxData=%h | LED=%h | Transmit=%b",
-                 $time, TXD_debug, RxData, LED, Transmit_debug);
-    end
+            // Press transmit button
+            vif.btn_transmit <= 1'b1;
 
-endmodule
+            repeat(20)
+                @(posedge vif.clk);
+
+
+            // Release button
+            vif.btn_transmit <= 1'b0;
+
+
+            $display("[DRV] TRANSMIT BUTTON RELEASED");
+
+
+            // Tell generator that driving is complete
+            -> drvnext;
+
+
+            // Wait until receiver finishes
+            wait(vif.done == 1'b1);
+
+        end
+
+    endtask
+
+endclass
+class monitor;
+
+    mailbox #(transaction) mbx;
+
+    virtual uart_if vif;
+
+    transaction tr;
+
+
+    function new(mailbox #(transaction) mbx);
+
+        this.mbx = mbx;
+
+    endfunction
+
+
+    task run();
+
+        forever begin
+
+            // Wait until receiver says byte is complete
+            @(posedge vif.done);
+
+            tr = new();
+
+            tr.RxData = vif.RxData;
+
+            $display("[MON] RX DATA = %0d (0x%02h)",
+                     tr.RxData,
+                     tr.RxData);
+
+
+            mbx.put(tr);
+
+        end
+
+    endtask
+
+endclass
+
+
+class scoreboard;
+
+    mailbox #(transaction) mbxds;
+    mailbox #(transaction) mbxms;
+
+    transaction expected;
+    transaction actual;
+
+    event sconext;
+
+    int err = 0;
+
+
+    function new(
+        mailbox #(transaction) mbxds,
+        mailbox #(transaction) mbxms
+    );
+
+        this.mbxds = mbxds;
+        this.mbxms = mbxms;
+
+    endfunction
+
+
+    task run();
+
+        forever begin
+
+            // Expected transaction
+            mbxds.get(expected);
+
+            // Actual transaction
+            mbxms.get(actual);
+
+
+            $display(
+                "[SCO] EXPECTED = %0d (0x%02h) | ACTUAL = %0d (0x%02h)",
+                expected.data,
+                expected.data,
+                actual.RxData,
+                actual.RxData
+            );
+
+
+            if(expected.data == actual.RxData) begin
+
+                $display("[SCO] DATA MATCH");
+
+            end
+
+            else begin
+
+                $display("[SCO] DATA MISMATCH");
+
+                err++;
+
+            end
+
+
+            $display("------------------------------------");
+
+
+            -> sconext;
+
+        end
+
+    endtask
+
+endclass
+
+class environment;
+
+    generator   gen;
+    driver      drv;
+    monitor     mon;
+    scoreboard  sco;
+
+
+    mailbox #(transaction) mbxgd;
+
+    mailbox #(transaction) mbxds;
+
+    mailbox #(transaction) mbxms;
+
+
+    event nextgd;
+    event nextgs;
+
+
+    virtual uart_if vif;
+
+
+    function new(virtual uart_if vif);
+
+        this.vif = vif;
+
+
+        // Mailboxes
+        mbxgd = new();
+        mbxds = new();
+        mbxms = new();
+
+
+        // Components
+        gen = new(mbxgd);
+
+        drv = new(mbxgd);
+
+        mon = new(mbxms);
+
+        sco = new(mbxds, mbxms);
+
+
+        // Interface connections
+        drv.vif = vif;
+        mon.vif = vif;
+
+
+        // Generator -> Driver synchronization
+        gen.drvnext = nextgd;
+        drv.drvnext = nextgd;
+
+
+        // Generator -> Scoreboard synchronization
+        gen.sconext = nextgs;
+        sco.sconext = nextgs;
+
+    endfunction
+
+
+    task pre_test();
+
+        drv.reset();
+
+    endtask
+
+
+    task test();
+
+        fork
+
+            gen.run();
+
+            drv.run();
+
+            mon.run();
+
+            sco.run();
+
+        join_any
+
+    endtask
+
+
+    task post_test();
+
+        wait(gen.done.triggered);
+
+        $display("");
+        $display("====================================");
+        $display("ERROR COUNT = %0d", sco.err);
+        $display("====================================");
+
+        $finish();
+
+    endtask
+
+
+    task run();
+
+        pre_test();
+
+        test();
+
+        post_test();
+
+    endtask
+
+endclass
