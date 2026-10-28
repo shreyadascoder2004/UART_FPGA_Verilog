@@ -78,51 +78,5 @@ sim/                     UVM verification environment (SystemVerilog)
 └── tb_top.sv            Simulation top, DUT instantiation, loopback
 ```
 
-## Getting started (Vivado)
 
-1. Create a new RTL project targeting your FPGA board.
-2. Add everything in `rtl/` as **design sources**; set `uart_top.v` as top.
-3. Add `constraints/uart_top.xdc` — **edit the pin `LOC` values** to match
-   your actual board before running implementation.
-4. Add everything in `sim/` as **simulation sources**; set `tb_top` as the
-   simulation top.
-5. Project Settings → Simulation → set UVM version to 1.2.
-6. Run Behavioral Simulation. Watch for the `[SCO] DATA MATCH` /
-   `TOTAL PASS=.. TOTAL ERRORS=..` lines in the Tcl console.
 
-Full step-by-step instructions, including the exact compile-order gotcha
-(`uart_scoreboard.sv` must compile before `uart_driver.sv`), are in
-[`README.md`](./README.md).
-
-## Register map
-
-| Offset | Name     | Access | Description                          |
-|--------|----------|--------|---------------------------------------|
-| 0x0    | TXDATA   | W      | Write byte, pushes into TX FIFO       |
-| 0x4    | RXDATA   | R      | Read byte, pops from RX FIFO          |
-| 0x8    | STATUS   | R      | TX full/empty, RX full/empty, errors  |
-| 0xC    | CTRL     | RW     | IRQ enables, parity enable/polarity   |
-| 0x10   | BAUDDIV  | RW     | Runtime baud divisor override         |
-
-## What's simulated vs. what's verified on hardware
-
-The current testbench uses an internal `TXD → RxD` **loopback** in
-simulation — this verifies the TX and RX datapaths and the UVM environment
-end-to-end, but has not yet been run against a real external device (a
-second board, a UART-to-USB bridge, a logic analyzer capture). That's the
-next step for anyone picking this up — see Roadmap below.
-
-## Roadmap / known limitations
-
-- [ ] Hardware bring-up: physical loopback or PC-terminal test over a
-      UART-to-USB bridge, with timing closure report
-- [ ] AXI-Lite or APB wrapper around `uart_regs.v` for real SoC integration
-- [ ] Overrun-error logic is currently simplistic (flags on any FIFO-full
-      write-attempt cycle, not a precise "lost byte" count)
-- [ ] No configurable data-bit count (fixed at 8) or stop-bit count (fixed at 1)
-- [ ] Formal verification of selected properties (e.g. with SymbiYosys) not
-      yet attempted
-
-## License
-
-MIT (or your choice — add a LICENSE file)
